@@ -14,6 +14,9 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -85,6 +88,14 @@ public class IndexInstance {
         //TODO close and delete directory
     }
 
+    public void flush() throws IOException {
+        if (!isOpen()) {
+            logger.info("index: {} closed, not need to flush.", indexName);
+            return;
+        }
+        indexWriter.commit();
+    }
+
     public int index(Document document) throws IOException {
         if (indexWriter == null) {
             return -1;
@@ -97,16 +108,27 @@ public class IndexInstance {
     public Map<String, Object> search(Query query, int size, ScoreDoc after) throws IOException {
         IndexSearcher searcher = null;
         logger.info("query is: {}.", query.toString());
+        Map<String, Object> rtn = new HashMap<>();
         try {
             searcher = searcherManager.acquire();
             TopScoreDocCollector collector = TopScoreDocCollector.create(size, after);
             searcher.search(query, collector);
+            TopDocs topDocs = collector.topDocs();
+            int totalHits = topDocs.totalHits;
+            rtn.put("total", totalHits);
+            ScoreDoc[] scoreDocs = topDocs.scoreDocs;
+            List<Document> data = new ArrayList<>();
+            for (ScoreDoc scoreDoc : scoreDocs) {
+                Document doc = searcher.doc( scoreDoc.doc);
+                data.add(doc);
+            }
+            rtn.put("data", data);
         } finally {
             if (searcher != null) {
                 searcherManager.release(searcher);
             }
         }
-
+        return rtn;
     }
 
 
