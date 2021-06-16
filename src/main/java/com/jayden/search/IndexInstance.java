@@ -93,7 +93,9 @@ public class IndexInstance {
             logger.info("index: {} closed, not need to flush.", indexName);
             return;
         }
+        logger.info("start commit index: {} to lucene.", indexName);
         indexWriter.commit();
+        logger.info("commit index: {} to lucene succeed.", indexName);
     }
 
     public int index(Document document) throws IOException {
