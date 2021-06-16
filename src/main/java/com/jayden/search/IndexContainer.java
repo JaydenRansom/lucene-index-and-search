@@ -8,10 +8,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.*;
 
 /**
  * Container for multi indices
@@ -66,6 +63,42 @@ public class IndexContainer {
                 return t;
             }
         });
+    }
+
+    private void scheduleCommit() {
+        this.refreshIndexExecutor = Executors.newSingleThreadScheduledExecutor(new ThreadFactory() {
+            @Override
+            public Thread newThread(Runnable r) {
+                Thread t = new Thread();
+                t.setName("commit-thread");
+                return t;
+            }
+        });
+        this.refreshIndexExecutor.scheduleWithFixedDelay(new Runnable() {
+            @Override
+            public void run() {
+                //refresh
+                try {
+                    Map<String, IndexInstance> map = indices;
+                    if (map == null) {
+                        logger.info("not index exist.");
+                        return;
+                    }
+                    for (Map.Entry<String, IndexInstance> entry : map.entrySet()) {
+                        try {
+                            entry.getValue().flush();
+                        } catch (Exception e) {
+                            logger.error("index commit error: {}.", entry.getKey(), e);
+                        } catch (Throwable t) {
+                            logger.error("index commit error fatal: {}.", entry.getKey(), t);
+                        }
+                    }
+                } catch (Throwable t) {
+                    logger.error("refresh thread error fatal.", t);
+                }
+
+            }
+        }, 60, 60, TimeUnit.SECONDS);
     }
 
     public void write(String index, Document document) throws IOException {
